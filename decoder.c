@@ -82,7 +82,7 @@ void DecodeInstruction(u_int8_t *instruction_line) {
   const char *source_register = register_table[(w_bit << 3) | reg];
   const char *destination_register = register_table[(w_bit << 3) | rm];
 
-  printf("bits 16\n\n");
+  printf("bits 16\n");
   printf("%s %s, %s\n", instruction, destination_register, source_register);
 }
 
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
   for (int i = 7; i >= 0; i--) {
     printf("%d", (buffer[0] & (1 << i)) != 0);
   }
-  printf("\n");
+  printf("\n\n");
 
   DecodeInstruction(buffer);
 
