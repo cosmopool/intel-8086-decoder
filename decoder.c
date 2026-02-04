@@ -45,12 +45,10 @@ int DecodeInstruction(u_int8_t *bytes) {
 
   // check if D bit is set
   u_int8_t d_bit = (bytes[cursor] & (1 << 2));
-  // printf("D: %d\n", d_bit != 0);
   (void)d_bit;
 
   // check if W bit is set
   u_int8_t w_bit = (bytes[cursor] & 1);
-  // printf("W: %d\n", w_bit != 0);
   (void)w_bit;
 
   cursor += 1;
@@ -107,26 +105,12 @@ int main(int argc, char **argv) {
   // calculate the file size
   fseek(file_ptr, 0, SEEK_END);
   long file_length = ftell(file_ptr);
-  printf("[debug] file length: %ld\n", file_length);
   rewind(file_ptr);
 
   // allocate and copy the file contents
   u_int8_t *buffer = (u_int8_t *)malloc(file_length * sizeof(char));
   fread(buffer, file_length, 1, file_ptr);
   fclose(file_ptr);
-
-  // print file content as bytes
-  printf("%d %d\n", buffer[0], buffer[1]);
-  // print file content bits
-  printf("00000000: ");
-  for (int i = 7; i >= 0; i--) {
-    printf("%d", (buffer[0] & (1 << i)) != 0);
-  }
-  printf(" ");
-  for (int i = 7; i >= 0; i--) {
-    printf("%d", (buffer[0] & (1 << i)) != 0);
-  }
-  printf("\n\n");
 
   printf("bits 16\n");
   int instruction_start = 0;
