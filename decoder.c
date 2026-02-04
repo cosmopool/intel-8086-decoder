@@ -21,8 +21,14 @@
 
 #define MOV 34
 
-int main() {
-  FILE *file_ptr = fopen("listing_0037_single_register_mov", "rb");
+int main(int argc, char **argv) {
+  (void)argc;
+  if (!argv[1]) {
+    printf("the name of the binary file to decode must be provided");
+    exit(1);
+  }
+
+  FILE *file_ptr = fopen(argv[1], "rb");
   if (file_ptr == NULL) {
     perror("fopen");
     exit(1);
