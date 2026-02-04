@@ -32,9 +32,15 @@ int DecodeInstruction(u_int8_t *bytes) {
   int cursor = 0;
 
   // OPCODE. extract bits 7 to 2 from first byte
-  u_int8_t op_code = (bytes[cursor] & 0xFC) >> 2;
+  u_int8_t op_code = bytes[cursor] >> 2;
   switch (op_code) {
-  case MOV:
+
+  case 0xB:
+  case 0x22:
+  case 0x23:
+  case 0x28:
+  case 0x29:
+  case 0x31:
     instruction = "mov";
     break;
 
