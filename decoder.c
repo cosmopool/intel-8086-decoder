@@ -20,15 +20,22 @@
 #define SI "si"
 #define DI "di"
 
-#define MOV 34
-
 // REG (register) field encoding table
 const char *register_table[16] = {AL, CL, DL, BL, AH, CH, DH, BH,
                                   AX, CX, DX, BX, SP, BP, SI, DI};
 
+typedef enum InstructionEnum { MOV } Instruction;
+
+const char *InstructionToString(Instruction i) {
+  switch (i) {
+  case MOV:
+    return "mov";
+  }
+}
+
 // Returns how many bytes has read
 int DecodeInstruction(u_int8_t *bytes) {
-  const char *instruction;
+  Instruction instruction;
   int cursor = 0;
 
   // OPCODE. extract bits 7 to 2 from first byte
@@ -41,7 +48,7 @@ int DecodeInstruction(u_int8_t *bytes) {
   case 0x28:
   case 0x29:
   case 0x31:
-    instruction = "mov";
+    instruction = MOV;
     break;
 
   default:
@@ -90,7 +97,8 @@ int DecodeInstruction(u_int8_t *bytes) {
   const char *source_register = register_table[(w_bit << 3) | reg];
   const char *destination_register = register_table[(w_bit << 3) | rm];
 
-  printf("%s %s, %s\n", instruction, destination_register, source_register);
+  printf("%s %s, %s\n", InstructionToString(instruction), destination_register,
+         source_register);
 
   return cursor;
 }
