@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "base_types.h"
 
@@ -27,7 +28,7 @@
 #define BP_DI "bp + di"
 #define SI "si"
 #define DI "di"
-#define DA "-1" // DIRECT ACCESS
+#define BP "bp"
 #define BX "bx"
 
 #define BX_SI_D "bx + si + "
@@ -44,7 +45,7 @@ const char *register_table[16] = {AL, CL, DL, BL, AH, CH, DH, BH,
                                   AX, CX, DX, BX, SP, BP, SI, DI};
 
 const char *effective_address_register_table[] = {
-    BX_SI,   BX_DI,   BP_SI,   BP_DI,   SI,   DI,   DA,   BX,
+    BX_SI,   BX_DI,   BP_SI,   BP_DI,   SI,   DI,   BP,   BX,
     BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
     BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
 };
@@ -62,27 +63,47 @@ const char *InstructionToString(Instruction i) {
   }
 }
 
+u8 verbose = 0;
+
+void ConsumeByte(u8 *bytes, char *buff, i32 *pos) {
+  *pos += 1;
+  assert(*pos >= 0);
+
+  if (!verbose) {
+    return;
+  }
+
+  char bit[8];
+  for (i32 i = 7; i >= 0; i--) {
+    snprintf(bit, 8, "%d", (bytes[*pos] & (1 << i)) != 0);
+    strcat(buff, bit);
+  }
+  strcat(buff, " ");
+}
+
 // Returns how many bytes has read
 u32 DecodeInstruction(u8 *bytes) {
   Instruction instruction;
-  int cursor = 0;
+  i32 cursor = -1;
+  char bytes_str[1024] = {0};
+  ConsumeByte(bytes, bytes_str, &cursor);
 
   // OPCODE. extract bits 7 to 4 from first byte
   u8 op_code = bytes[cursor] >> 4;
   switch (op_code) {
   case 0xB:
+    // printf("[%hx]", op_code);
     // check if W bit is set (00001000)
     u8 w_bit = (bytes[cursor] & (1 << 3)) != 0;
     // REG. extract bits 2 to 0 (00000111) from first byte
     u8 reg = bytes[cursor] & 0x7;
-    cursor += 1;
+    ConsumeByte(bytes, bytes_str, &cursor);
 
     char source[32];
     const char *destination = register_table[(w_bit << 3) | reg];
-    // printf("W: %d | REG: %d | register: %s\n", w_bit, reg, destination);
     if (w_bit == 1) {
       u8 low = bytes[cursor];
-      cursor += 1;
+      ConsumeByte(bytes, bytes_str, &cursor);
       u8 hi = bytes[cursor];
       u16 byte = (hi << 7) | low;
       sprintf(source, "%d", byte);
@@ -90,6 +111,12 @@ u32 DecodeInstruction(u8 *bytes) {
       sprintf(source, "%d", bytes[cursor]);
     }
 
+    if (verbose) {
+      printf("\n");
+      printf("OPCODE: %hx | W: %d | REG: %d | register: %s", op_code, w_bit,
+             reg, destination);
+      printf("\n%s\n", bytes_str);
+    }
     printf("%s %s, %s\n", "mov", destination, source);
     return cursor;
 
@@ -104,6 +131,7 @@ u32 DecodeInstruction(u8 *bytes) {
   case 0x28:
   case 0x29:
   case 0x31:
+    // printf("[%hx]", op_code);
     instruction = MOV;
     break;
 
@@ -114,10 +142,10 @@ u32 DecodeInstruction(u8 *bytes) {
 
   // check if D bit is set
   u8 d_bit = (bytes[cursor] & (1 << 2)) != 0;
-
   // check if W bit is set
   u8 w_bit = (bytes[cursor] & 1) != 0;
-  cursor += 1;
+  ConsumeByte(bytes, bytes_str, &cursor);
+
   // MOD. extract bits 7 and 6 (11000000) from second byte
   u8 mod = bytes[cursor] >> 6;
   // R/M. extract bits 2 to 0 (00000111) from second byte
@@ -125,23 +153,78 @@ u32 DecodeInstruction(u8 *bytes) {
   // REG. extract bits 5 to 3 (00111000) from second byte
   u8 reg = (bytes[cursor] & 0x38) >> 3;
 
-  char source[32];
+  const char *source;
   const char *destination;
-  const char *from_reg = register_table[(w_bit << 3) | reg];
-  if (mod == 0x3) {
-    const char *from_rm = register_table[(w_bit << 3) | rm];
-    if (d_bit) {
-      sprintf(source, "%s", from_rm);
-      destination = from_reg;
-    } else {
-      sprintf(source, "%s", from_reg);
-      destination = from_rm;
+  char from_reg[32] = {0};
+  char from_rm[32] = {0};
+  sprintf(from_reg, "%s", register_table[(w_bit << 3) | reg]);
+  sprintf(from_rm, "%s", register_table[(w_bit << 3) | rm]);
+  switch (mod) {
+  // register mode
+  case 0x3:
+    break;
+
+  // 16-bit displacement
+  case 0x2: {
+    ConsumeByte(bytes, bytes_str, &cursor);
+    u8 low = bytes[cursor];
+    ConsumeByte(bytes, bytes_str, &cursor);
+    u8 hi = bytes[cursor];
+    u16 byte = (hi << 7) | low;
+
+    sprintf(from_reg, "[%s%d]",
+            effective_address_register_table[(mod << 3) | rm], byte);
+    break;
+  }
+
+  // 8-bit displacement
+  case 0x1: {
+    ConsumeByte(bytes, bytes_str, &cursor);
+    u8 low = bytes[cursor];
+    u8 idx = (mod << 3) | rm;
+    sprintf(from_reg, "[%s%d]", effective_address_register_table[idx], low);
+    break;
+  }
+
+  // memory mode
+  case 0x0: {
+    // is direct mode
+    if (rm == 0x6) {
+      ConsumeByte(bytes, bytes_str, &cursor);
+      u8 low = bytes[cursor];
+      ConsumeByte(bytes, bytes_str, &cursor);
+      u8 hi = bytes[cursor];
+      u16 byte = (hi << 7) | low;
+
+      char byte_str[32] = {0};
+      sprintf(byte_str, "%d", byte);
+      strcat(from_rm, byte_str);
+      break;
     }
+
+    sprintf(from_rm, "[%s]", effective_address_register_table[(mod << 2) | rm]);
+    break;
+  }
+
+  default:
+    printf("This MOD (%d) is not supported!", mod);
+    exit(1);
+  }
+
+  if (!d_bit) {
+    source = from_reg;
+    destination = from_rm;
   } else {
-    sprintf(source, "[%s]", effective_address_register_table[(mod << 2) | rm]);
+    source = from_rm;
     destination = from_reg;
   }
 
+  if (verbose) {
+    printf("\n");
+    printf("OPCODE: %hx | D: %d | W: %d | MOD: %d | REG: %d | R/M: %d", op_code,
+           d_bit, w_bit, mod, reg, rm);
+    printf("\n%s\n", bytes_str);
+  }
   printf("%s %s, %s\n", InstructionToString(instruction), destination, source);
 
   return cursor;
@@ -152,6 +235,10 @@ i32 main(i32 argc, char **argv) {
   if (!argv[1]) {
     printf("the name of the binary file to decode must be provided");
     exit(1);
+  }
+
+  if (argv[2]) {
+    verbose = strcmp(argv[2], "-v") == 0;
   }
 
   FILE *file_ptr = fopen(argv[1], "rb");
