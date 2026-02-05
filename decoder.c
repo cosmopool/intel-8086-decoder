@@ -21,9 +21,33 @@
 #define SI "si"
 #define DI "di"
 
+#define BX_SI "bx + si"
+#define BX_DI "bx + di"
+#define BP_SI "bp + si"
+#define BP_DI "bp + di"
+#define SI "si"
+#define DI "di"
+#define DA "-1" // DIRECT ACCESS
+#define BX "bx"
+
+#define BX_SI_D "bx + si + "
+#define BX_DI_D "bx + di + "
+#define BP_SI_D "bp + si + "
+#define BP_DI_D "bp + di + "
+#define SI_D "si + "
+#define DI_D "di + "
+#define BP_D "bp + "
+#define BX_D "bx + "
+
 // REG (register) field encoding table
 const char *register_table[16] = {AL, CL, DL, BL, AH, CH, DH, BH,
                                   AX, CX, DX, BX, SP, BP, SI, DI};
+
+const char *effective_address_register_table[] = {
+    BX_SI,   BX_DI,   BP_SI,   BP_DI,   SI,   DI,   DA,   BX,
+    BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
+    BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
+};
 
 typedef enum InstructionEnum { MOV } Instruction;
 
@@ -89,52 +113,33 @@ u32 DecodeInstruction(u8 *bytes) {
   }
 
   // check if D bit is set
-  u8 d_bit = (bytes[cursor] & (1 << 2));
-  (void)d_bit;
+  u8 d_bit = (bytes[cursor] & (1 << 2)) != 0;
 
   // check if W bit is set
-  u8 w_bit = (bytes[cursor] & 1);
-  (void)w_bit;
+  u8 w_bit = (bytes[cursor] & 1) != 0;
   cursor += 1;
-
-  // MOD. extract bits 7 to 6 from second byte
+  // MOD. extract bits 7 and 6 (11000000) from second byte
   u8 mod = bytes[cursor] >> 6;
-  switch (mod) {
-  case 3:
-    break;
-
-  default:
-    printf("This MOD value (%d) is not implemented yet!", mod);
-    exit(1);
-  }
-
-  // R/M. extract bits 2 to 0 from second byte
+  // R/M. extract bits 2 to 0 (00000111) from second byte
   u8 rm = bytes[cursor] & 0x7;
-  switch (rm) {
-  case 56:
-    break;
-
-  default:
-    // MOD is set to Register Mode (11) so R/M identifies
-    // the second register operand.
-    if (mod == 3) {
-      break;
-    }
-    printf("This R/M value (%d) is not implemented yet!", rm);
-    exit(1);
-  }
-
   // REG. extract bits 5 to 3 (00111000) from second byte
   u8 reg = (bytes[cursor] & 0x38) >> 3;
 
-  const char *source;
+  char source[32];
   const char *destination;
-  if (d_bit == 0) {
-    source = register_table[(w_bit << 3) | reg];
-    destination = register_table[(w_bit << 3) | rm];
+  const char *from_reg = register_table[(w_bit << 3) | reg];
+  if (mod == 0x3) {
+    const char *from_rm = register_table[(w_bit << 3) | rm];
+    if (d_bit) {
+      sprintf(source, "%s", from_rm);
+      destination = from_reg;
+    } else {
+      sprintf(source, "%s", from_reg);
+      destination = from_rm;
+    }
   } else {
-    source = register_table[(w_bit << 3) | rm];
-    destination = register_table[(w_bit << 3) | reg];
+    sprintf(source, "[%s]", effective_address_register_table[(mod << 2) | rm]);
+    destination = from_reg;
   }
 
   printf("%s %s, %s\n", InstructionToString(instruction), destination, source);
