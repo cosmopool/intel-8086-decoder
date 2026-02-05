@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 
 #include "base_types.h"
 
@@ -40,15 +39,42 @@ const char *InstructionToString(Instruction i) {
 }
 
 // Returns how many bytes has read
-int DecodeInstruction(u8 *bytes) {
+u32 DecodeInstruction(u8 *bytes) {
   Instruction instruction;
   int cursor = 0;
 
-  // OPCODE. extract bits 7 to 2 from first byte
-  u8 op_code = bytes[cursor] >> 2;
+  // OPCODE. extract bits 7 to 4 from first byte
+  u8 op_code = bytes[cursor] >> 4;
   switch (op_code) {
-
   case 0xB:
+    // check if W bit is set (00001000)
+    u8 w_bit = (bytes[cursor] & (1 << 3)) != 0;
+    // REG. extract bits 2 to 0 (00000111) from first byte
+    u8 reg = bytes[cursor] & 0x7;
+    cursor += 1;
+
+    char source[32];
+    const char *destination = register_table[(w_bit << 3) | reg];
+    // printf("W: %d | REG: %d | register: %s\n", w_bit, reg, destination);
+    if (w_bit == 1) {
+      u8 low = bytes[cursor];
+      cursor += 1;
+      u8 hi = bytes[cursor];
+      u16 byte = (hi << 7) | low;
+      sprintf(source, "%d", byte);
+    } else {
+      sprintf(source, "%d", bytes[cursor]);
+    }
+
+    printf("%s %s, %s\n", "mov", destination, source);
+    return cursor;
+
+  default:
+    break;
+  }
+  // OPCODE. extract bits 7 to 2 from first byte
+  op_code = bytes[cursor] >> 2;
+  switch (op_code) {
   case 0x22:
   case 0x23:
   case 0x28:
@@ -144,7 +170,7 @@ i32 main(i32 argc, char **argv) {
   while (instruction_start < file_length) {
     // last instruction read
     instruction_start += DecodeInstruction(buffer + instruction_start);
-    assert(buffer[instruction_start] != '\0');
+    assert(instruction_start < file_length);
     // start at the next one
     instruction_start += 1;
   }
