@@ -96,13 +96,20 @@ int DecodeInstruction(u_int8_t *bytes) {
     exit(1);
   }
 
-  // REG. extract bits 5 to 3 from second byte
+  // REG. extract bits 5 to 3 (00111000) from second byte
   u_int8_t reg = (bytes[cursor] & 0x38) >> 3;
-  const char *source_register = register_table[(w_bit << 3) | reg];
-  const char *destination_register = register_table[(w_bit << 3) | rm];
 
-  printf("%s %s, %s\n", InstructionToString(instruction), destination_register,
-         source_register);
+  const char *source;
+  const char *destination;
+  if (d_bit == 0) {
+    source = register_table[(w_bit << 3) | reg];
+    destination = register_table[(w_bit << 3) | rm];
+  } else {
+    source = register_table[(w_bit << 3) | rm];
+    destination = register_table[(w_bit << 3) | reg];
+  }
+
+  printf("%s %s, %s\n", InstructionToString(instruction), destination, source);
 
   return cursor;
 }
