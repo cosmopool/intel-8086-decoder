@@ -30,6 +30,10 @@ const char *InstructionToString(Instruction i) {
   switch (i) {
   case MOV:
     return "mov";
+
+  default:
+    printf("Invalid instruction (%d) to parse as string", i);
+    exit(1);
   }
 }
 
