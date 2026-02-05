@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#include "base_types.h"
+
 #define AL "al"
 #define CL "cl"
 #define DL "dl"
@@ -38,12 +40,12 @@ const char *InstructionToString(Instruction i) {
 }
 
 // Returns how many bytes has read
-int DecodeInstruction(u_int8_t *bytes) {
+int DecodeInstruction(u8 *bytes) {
   Instruction instruction;
   int cursor = 0;
 
   // OPCODE. extract bits 7 to 2 from first byte
-  u_int8_t op_code = bytes[cursor] >> 2;
+  u8 op_code = bytes[cursor] >> 2;
   switch (op_code) {
 
   case 0xB:
@@ -61,16 +63,16 @@ int DecodeInstruction(u_int8_t *bytes) {
   }
 
   // check if D bit is set
-  u_int8_t d_bit = (bytes[cursor] & (1 << 2));
+  u8 d_bit = (bytes[cursor] & (1 << 2));
   (void)d_bit;
 
   // check if W bit is set
-  u_int8_t w_bit = (bytes[cursor] & 1);
+  u8 w_bit = (bytes[cursor] & 1);
   (void)w_bit;
   cursor += 1;
 
   // MOD. extract bits 7 to 6 from second byte
-  u_int8_t mod = bytes[cursor] >> 6;
+  u8 mod = bytes[cursor] >> 6;
   switch (mod) {
   case 3:
     break;
@@ -81,7 +83,7 @@ int DecodeInstruction(u_int8_t *bytes) {
   }
 
   // R/M. extract bits 2 to 0 from second byte
-  u_int8_t rm = bytes[cursor] & 0x7;
+  u8 rm = bytes[cursor] & 0x7;
   switch (rm) {
   case 56:
     break;
@@ -97,7 +99,7 @@ int DecodeInstruction(u_int8_t *bytes) {
   }
 
   // REG. extract bits 5 to 3 (00111000) from second byte
-  u_int8_t reg = (bytes[cursor] & 0x38) >> 3;
+  u8 reg = (bytes[cursor] & 0x38) >> 3;
 
   const char *source;
   const char *destination;
@@ -114,7 +116,7 @@ int DecodeInstruction(u_int8_t *bytes) {
   return cursor;
 }
 
-int main(int argc, char **argv) {
+i32 main(i32 argc, char **argv) {
   (void)argc;
   if (!argv[1]) {
     printf("the name of the binary file to decode must be provided");
@@ -129,16 +131,16 @@ int main(int argc, char **argv) {
 
   // calculate the file size
   fseek(file_ptr, 0, SEEK_END);
-  long file_length = ftell(file_ptr);
+  u64 file_length = ftell(file_ptr);
   rewind(file_ptr);
 
   // allocate and copy the file contents
-  u_int8_t *buffer = (u_int8_t *)malloc(file_length * sizeof(char));
+  u8 *buffer = (u8 *)malloc(file_length * sizeof(char));
   fread(buffer, file_length, 1, file_ptr);
   fclose(file_ptr);
 
   printf("bits 16\n");
-  int instruction_start = 0;
+  u32 instruction_start = 0;
   while (instruction_start < file_length) {
     // last instruction read
     instruction_start += DecodeInstruction(buffer + instruction_start);
