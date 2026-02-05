@@ -67,10 +67,10 @@ int DecodeInstruction(u_int8_t *bytes) {
   // check if W bit is set
   u_int8_t w_bit = (bytes[cursor] & 1);
   (void)w_bit;
-
   cursor += 1;
+
   // MOD. extract bits 7 to 6 from second byte
-  u_int8_t mod = (bytes[cursor] & 0xC0) >> 6;
+  u_int8_t mod = bytes[cursor] >> 6;
   switch (mod) {
   case 3:
     break;
