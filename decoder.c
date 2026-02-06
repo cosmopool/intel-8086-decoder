@@ -173,7 +173,7 @@ u32 DecodeInstruction(u8 *bytes) {
     u8 hi = bytes[cursor];
     u16 byte = (hi << 7) | low;
 
-    sprintf(from_reg, "[%s%d]",
+    sprintf(from_rm, "[%s%d]",
             effective_address_register_table[(mod << 3) | rm], byte);
     break;
   }
@@ -183,7 +183,7 @@ u32 DecodeInstruction(u8 *bytes) {
     ConsumeByte(bytes, bytes_str, &cursor);
     u8 low = bytes[cursor];
     u8 idx = (mod << 3) | rm;
-    sprintf(from_reg, "[%s%d]", effective_address_register_table[idx], low);
+    sprintf(from_rm, "[%s%d]", effective_address_register_table[idx], low);
     break;
   }
 
