@@ -2,6 +2,10 @@
 
 ./build.sh
 
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+NORMAL=$(tput sgr0)
+
 for LISTING_ASM in listing_*.asm; do
   LISTING="${LISTING_ASM%.*}"
   printf "testing: %s: " "$LISTING"
@@ -11,13 +15,21 @@ for LISTING_ASM in listing_*.asm; do
     nasm "$LISTING"
   fi
 
-  ./decoder "$LISTING" > "decoded_$LISTING_ASM"
-  nasm "decoded_$LISTING_ASM"
+  if ! ./decoder "$LISTING" > "decoded_$LISTING_ASM"; then
+    printf "%s\n" "${RED}decoding failed${NORMAL}"
+    exit 1
+  fi
+
+  if ! nasm "decoded_$LISTING_ASM"; then
+    printf "%s\n" "${RED}compiling failed${NORMAL}"
+    exit 1
+  fi
+
 
   if  diff "$LISTING" "decoded_$LISTING" 1> /dev/null; then 
-    printf "pass\n"
+    printf "%s\n" "${GREEN}pass${NORMAL}"
   else
-    printf "failed\n"
+    printf "%s\n" "${RED}failed${NORMAL}"
     exit 1
   fi
 done
