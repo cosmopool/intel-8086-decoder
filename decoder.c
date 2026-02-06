@@ -142,7 +142,7 @@ u32 DecodeInstruction(u8 *bytes) {
   }
 
   // check if D bit is set
-  u8 d_bit = (bytes[cursor] & (1 << 2)) != 0;
+  u8 d_bit = (bytes[cursor] & (1 << 1)) != 0;
   // check if W bit is set
   u8 w_bit = (bytes[cursor] & 1) != 0;
   ConsumeByte(bytes, bytes_str, &cursor);
