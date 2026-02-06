@@ -105,7 +105,7 @@ u32 DecodeInstruction(u8 *bytes) {
       u8 low = bytes[cursor];
       ConsumeByte(bytes, bytes_str, &cursor);
       u8 hi = bytes[cursor];
-      u16 byte = (hi << 8) | low;
+      u16 byte = (hi << 7) | low;
       sprintf(source, "%d", byte);
     } else {
       sprintf(source, "%d", bytes[cursor]);
@@ -196,10 +196,7 @@ u32 DecodeInstruction(u8 *bytes) {
       ConsumeByte(bytes, bytes_str, &cursor);
       u8 hi = bytes[cursor];
       u16 byte = (hi << 8) | low;
-
-      char byte_str[32] = {0};
-      sprintf(byte_str, "%d", byte);
-      strcat(from_rm, byte_str);
+      sprintf(from_rm, "[%d]", byte);
       break;
     }
 
