@@ -91,7 +91,7 @@ u32 DecodeInstruction(u8 *bytes) {
   // OPCODE. extract bits 7 to 4 from first byte
   u8 op_code = bytes[cursor] >> 4;
   switch (op_code) {
-  case 0xB:
+  case 0xB: {
     // printf("[%hx]", op_code);
     // check if W bit is set (00001000)
     u8 w_bit = (bytes[cursor] & (1 << 3)) != 0;
@@ -119,6 +119,7 @@ u32 DecodeInstruction(u8 *bytes) {
     }
     printf("%s %s, %s\n", "mov", destination, source);
     return cursor;
+  }
 
   default:
     break;
