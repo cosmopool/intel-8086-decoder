@@ -52,7 +52,7 @@ const char *effective_address_register_table[] = {
 
 typedef enum InstructionEnum { MOV } Instruction;
 
-const char *InstructionToString(Instruction i) {
+const char *instructionToString(Instruction i) {
   switch (i) {
   case MOV:
     return "mov";
@@ -65,7 +65,7 @@ const char *InstructionToString(Instruction i) {
 
 u8 verbose = 0;
 
-void ConsumeByte(u8 *bytes, char *buff, i32 *pos) {
+void consumeByte(u8 *bytes, char *buff, i32 *pos) {
   *pos += 1;
   assert(*pos >= 0);
 
@@ -82,11 +82,11 @@ void ConsumeByte(u8 *bytes, char *buff, i32 *pos) {
 }
 
 // Returns how many bytes has read
-u32 DecodeInstruction(u8 *bytes) {
+u32 decodeInstruction(u8 *bytes) {
   Instruction instruction;
   i32 cursor = -1;
   char bytes_str[1024] = {0};
-  ConsumeByte(bytes, bytes_str, &cursor);
+  consumeByte(bytes, bytes_str, &cursor);
 
   // OPCODE. extract bits 7 to 4 from first byte
   u8 op_code = bytes[cursor] >> 4;
@@ -97,13 +97,13 @@ u32 DecodeInstruction(u8 *bytes) {
     u8 w_bit = (bytes[cursor] & (1 << 3)) != 0;
     // REG. extract bits 2 to 0 (00000111) from first byte
     u8 reg = bytes[cursor] & 0x7;
-    ConsumeByte(bytes, bytes_str, &cursor);
+    consumeByte(bytes, bytes_str, &cursor);
 
     char source[32];
     const char *destination = register_table[(w_bit << 3) | reg];
     if (w_bit == 1) {
       u8 low = bytes[cursor];
-      ConsumeByte(bytes, bytes_str, &cursor);
+      consumeByte(bytes, bytes_str, &cursor);
       u8 hi = bytes[cursor];
       u16 byte = (hi << 8) | low;
       sprintf(source, "%d", byte);
@@ -145,7 +145,7 @@ u32 DecodeInstruction(u8 *bytes) {
   u8 d_bit = (bytes[cursor] & (1 << 1)) != 0;
   // check if W bit is set
   u8 w_bit = (bytes[cursor] & 1) != 0;
-  ConsumeByte(bytes, bytes_str, &cursor);
+  consumeByte(bytes, bytes_str, &cursor);
 
   // MOD. extract bits 7 and 6 (11000000) from second byte
   u8 mod = bytes[cursor] >> 6;
@@ -167,9 +167,9 @@ u32 DecodeInstruction(u8 *bytes) {
 
   // 16-bit displacement
   case 0x2: {
-    ConsumeByte(bytes, bytes_str, &cursor);
+    consumeByte(bytes, bytes_str, &cursor);
     u8 low = bytes[cursor];
-    ConsumeByte(bytes, bytes_str, &cursor);
+    consumeByte(bytes, bytes_str, &cursor);
     u8 hi = bytes[cursor];
     i16 byte = (hi << 8) | low;
 
@@ -180,7 +180,7 @@ u32 DecodeInstruction(u8 *bytes) {
 
   // 8-bit displacement
   case 0x1: {
-    ConsumeByte(bytes, bytes_str, &cursor);
+    consumeByte(bytes, bytes_str, &cursor);
     u8 low = bytes[cursor];
     u8 idx = (mod << 3) | rm;
     sprintf(from_rm, "[%s%d]", effective_address_register_table[idx], low);
@@ -191,9 +191,9 @@ u32 DecodeInstruction(u8 *bytes) {
   case 0x0: {
     // is direct mode
     if (rm == 0x6) {
-      ConsumeByte(bytes, bytes_str, &cursor);
+      consumeByte(bytes, bytes_str, &cursor);
       u8 low = bytes[cursor];
-      ConsumeByte(bytes, bytes_str, &cursor);
+      consumeByte(bytes, bytes_str, &cursor);
       u8 hi = bytes[cursor];
       u16 byte = (hi << 8) | low;
       sprintf(from_rm, "[%d]", byte);
@@ -223,7 +223,7 @@ u32 DecodeInstruction(u8 *bytes) {
            d_bit, w_bit, mod, reg, rm);
     printf("\n%s\n", bytes_str);
   }
-  printf("%s %s, %s\n", InstructionToString(instruction), destination, source);
+  printf("%s %s, %s\n", instructionToString(instruction), destination, source);
 
   return cursor;
 }
@@ -259,7 +259,7 @@ i32 main(i32 argc, char **argv) {
   u32 instruction_start = 0;
   while (instruction_start < file_length) {
     // last instruction read
-    instruction_start += DecodeInstruction(buffer + instruction_start);
+    instruction_start += decodeInstruction(buffer + instruction_start);
     assert(instruction_start < file_length);
     // start at the next one
     instruction_start += 1;
