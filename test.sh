@@ -17,7 +17,7 @@ test_all() {
   
     # compile binary for this listing if does not exists
     if [ ! -e "$LISTING" ]; then
-      nasm "$LISTING"
+      nasm "$LISTING_ASM"
     fi
   
     if ! ./decoder "$LISTING" > "decoded_$LISTING_ASM"; then
