@@ -256,14 +256,14 @@ i32 main(i32 argc, char **argv) {
   rewind(file_ptr);
 
   // allocate and copy the file contents
-  u8 *buffer = (u8 *)malloc(file_length * sizeof(char));
-  fread(buffer, file_length, 1, file_ptr);
+  u8 *file_content = (u8 *)malloc(file_length * sizeof(char));
+  fread(file_content, file_length, 1, file_ptr);
   fclose(file_ptr);
 
   // buffer used to print the textual representation of the bytes consumed when
   // verbose flag is set
   char bit_pattern_str[32] = {0};
-  Decoder decoder = {.cursor = 0, .bytes = buffer, .bit_pattern_str = bit_pattern_str};
+  Decoder decoder = {.cursor = 0, .bytes = file_content, .bit_pattern_str = bit_pattern_str};
 
   printf("bits 16\n");
   while (decoder.cursor < file_length) {
