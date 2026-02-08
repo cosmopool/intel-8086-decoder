@@ -72,7 +72,7 @@ typedef struct {
   // String representation of individual bits of each byte consumed
   //
   // eg:. 11010010 01101010
-  char *debug_str;
+  char *bit_pattern_str;
 } Decoder;
 
 u8 consumeByte(Decoder *decoder) {
@@ -87,9 +87,9 @@ u8 consumeByte(Decoder *decoder) {
   char bit[8];
   for (i32 i = 7; i >= 0; i--) {
     snprintf(bit, 8, "%d", (current_byte & (1 << i)) != 0);
-    strcat(decoder->debug_str, bit);
+    strcat(decoder->bit_pattern_str, bit);
   }
-  strcat(decoder->debug_str, " ");
+  strcat(decoder->bit_pattern_str, " ");
 
   // leave cursor on the next byte
   decoder->cursor += 1;
@@ -125,7 +125,7 @@ void decodeInstruction(Decoder *decoder) {
       printf("\n");
       printf("OPCODE: %hx | W: %d | REG: %d | register: %s", op_code, w_bit,
              reg, destination);
-      printf("\n%s\n", decoder->debug_str);
+      printf("\n%s\n", decoder->bit_pattern_str);
     }
     printf("%s %s, %s\n", "mov", destination, source);
     return;
@@ -140,7 +140,6 @@ void decodeInstruction(Decoder *decoder) {
   case 0x28:
   case 0x29:
   case 0x31:
-    // printf("[%hx]", op_code);
     instruction = MOV;
     break;
 
@@ -224,7 +223,7 @@ void decodeInstruction(Decoder *decoder) {
     printf("\n");
     printf("OPCODE: %hx | D: %d | W: %d | MOD: %d | REG: %d | R/M: %d", op_code,
            d_bit, w_bit, mod, reg, rm);
-    printf("\n%s\n", decoder->debug_str);
+    printf("\n%s\n", decoder->bit_pattern_str);
   }
   printf("%s %s, %s\n", instructionToString(instruction), destination, source);
 }
@@ -263,14 +262,14 @@ i32 main(i32 argc, char **argv) {
 
   // buffer used to print the textual representation of the bytes consumed when
   // verbose flag is set
-  char debug_str[32] = {0};
-  Decoder decoder = {.cursor = 0, .bytes = buffer + 0, .debug_str = debug_str};
+  char bit_pattern_str[32] = {0};
+  Decoder decoder = {.cursor = 0, .bytes = buffer, .bit_pattern_str = bit_pattern_str};
 
   printf("bits 16\n");
   while (decoder.cursor < file_length) {
     decodeInstruction(&decoder);
-    // reset debug_str buff
-    debug_str[0] = '\0';
+    // reset buff
+    bit_pattern_str[0] = '\0';
   }
 
   return 0;
