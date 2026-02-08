@@ -229,6 +229,11 @@ u32 decodeInstruction(u8 *bytes) {
 }
 
 i32 main(i32 argc, char **argv) {
+#ifdef DEBUG
+  // print realtime without buffering (only when program stop running)
+  // during debug sessions
+  setbuf(stdout, NULL);
+#endif
   (void)argc;
   if (!argv[1]) {
     printf("the name of the binary file to decode must be provided");
