@@ -40,6 +40,8 @@
 #define BP_D "bp + "
 #define BX_D "bx + "
 
+u8 verbose = 0;
+
 // REG (register) field encoding table
 const char *register_table[16] = {AL, CL, DL, BL, AH, CH, DH, BH,
                                   AX, CX, DX, BX, SP, BP, SI, DI};
@@ -63,69 +65,75 @@ const char *instructionToString(Instruction i) {
   }
 }
 
-u8 verbose = 0;
+typedef struct {
+  u64 cursor;
+  u8 *bytes;
 
-void consumeByte(u8 *bytes, char *buff, i32 *pos) {
-  *pos += 1;
-  assert(*pos >= 0);
+  // String representation of individual bits of each byte consumed
+  //
+  // eg:. 11010010 01101010
+  char *debug_str;
+} Decoder;
+
+u8 consumeByte(Decoder *decoder) {
+  u8 current_byte = decoder->bytes[decoder->cursor];
 
   if (!verbose) {
-    return;
+    // leave cursor on the next byte
+    decoder->cursor += 1;
+    return current_byte;
   }
 
   char bit[8];
   for (i32 i = 7; i >= 0; i--) {
-    snprintf(bit, 8, "%d", (bytes[*pos] & (1 << i)) != 0);
-    strcat(buff, bit);
+    snprintf(bit, 8, "%d", (current_byte & (1 << i)) != 0);
+    strcat(decoder->debug_str, bit);
   }
-  strcat(buff, " ");
+  strcat(decoder->debug_str, " ");
+
+  // leave cursor on the next byte
+  decoder->cursor += 1;
+  return current_byte;
 }
 
-// Returns how many bytes has read
-u32 decodeInstruction(u8 *bytes) {
+// Decode the current instruction under cursor
+void decodeInstruction(Decoder *decoder) {
   Instruction instruction;
-  i32 cursor = -1;
-  char bytes_str[1024] = {0};
-  consumeByte(bytes, bytes_str, &cursor);
+  u8 first_byte = consumeByte(decoder);
 
   // OPCODE. extract bits 7 to 4 from first byte
-  u8 op_code = bytes[cursor] >> 4;
+  u8 op_code = first_byte >> 4;
   switch (op_code) {
   case 0xB: {
-    // printf("[%hx]", op_code);
     // check if W bit is set (00001000)
-    u8 w_bit = (bytes[cursor] & (1 << 3)) != 0;
+    u8 w_bit = (first_byte & (1 << 3)) != 0;
     // REG. extract bits 2 to 0 (00000111) from first byte
-    u8 reg = bytes[cursor] & 0x7;
-    consumeByte(bytes, bytes_str, &cursor);
+    u8 reg = first_byte & 0x7;
 
     char source[32];
     const char *destination = register_table[(w_bit << 3) | reg];
+    u8 low = consumeByte(decoder);
     if (w_bit == 1) {
-      u8 low = bytes[cursor];
-      consumeByte(bytes, bytes_str, &cursor);
-      u8 hi = bytes[cursor];
+      u8 hi = consumeByte(decoder);
       u16 byte = (hi << 8) | low;
       sprintf(source, "%d", byte);
     } else {
-      sprintf(source, "%d", bytes[cursor]);
+      sprintf(source, "%d", low);
     }
 
     if (verbose) {
       printf("\n");
       printf("OPCODE: %hx | W: %d | REG: %d | register: %s", op_code, w_bit,
              reg, destination);
-      printf("\n%s\n", bytes_str);
+      printf("\n%s\n", decoder->debug_str);
     }
     printf("%s %s, %s\n", "mov", destination, source);
-    return cursor;
+    return;
+  }
   }
 
-  default:
-    break;
-  }
   // OPCODE. extract bits 7 to 2 from first byte
-  op_code = bytes[cursor] >> 2;
+  op_code = first_byte >> 2;
   switch (op_code) {
   case 0x22:
   case 0x23:
@@ -137,22 +145,22 @@ u32 decodeInstruction(u8 *bytes) {
     break;
 
   default:
-    printf("This instruction (%d) is not implemented yet!", op_code);
+    printf("This instruction (0x%hx) is not implemented yet!", op_code);
     exit(1);
   }
 
   // check if D bit is set
-  u8 d_bit = (bytes[cursor] & (1 << 1)) != 0;
+  u8 d_bit = (first_byte & (1 << 1)) != 0;
   // check if W bit is set
-  u8 w_bit = (bytes[cursor] & 1) != 0;
-  consumeByte(bytes, bytes_str, &cursor);
+  u8 w_bit = (first_byte & 1) != 0;
 
+  u8 second_byte = consumeByte(decoder);
   // MOD. extract bits 7 and 6 (11000000) from second byte
-  u8 mod = bytes[cursor] >> 6;
+  u8 mod = second_byte >> 6;
   // R/M. extract bits 2 to 0 (00000111) from second byte
-  u8 rm = bytes[cursor] & 0x7;
+  u8 rm = second_byte & 0x7;
   // REG. extract bits 5 to 3 (00111000) from second byte
-  u8 reg = (bytes[cursor] & 0x38) >> 3;
+  u8 reg = (second_byte & 0x38) >> 3;
 
   const char *source;
   const char *destination;
@@ -167,10 +175,8 @@ u32 decodeInstruction(u8 *bytes) {
 
   // 16-bit displacement
   case 0x2: {
-    consumeByte(bytes, bytes_str, &cursor);
-    u8 low = bytes[cursor];
-    consumeByte(bytes, bytes_str, &cursor);
-    u8 hi = bytes[cursor];
+    u8 low = consumeByte(decoder);
+    u8 hi = consumeByte(decoder);
     i16 byte = (hi << 8) | low;
 
     sprintf(from_rm, "[%s%d]",
@@ -180,8 +186,7 @@ u32 decodeInstruction(u8 *bytes) {
 
   // 8-bit displacement
   case 0x1: {
-    consumeByte(bytes, bytes_str, &cursor);
-    u8 low = bytes[cursor];
+    u8 low = consumeByte(decoder);
     u8 idx = (mod << 3) | rm;
     sprintf(from_rm, "[%s%d]", effective_address_register_table[idx], low);
     break;
@@ -191,10 +196,8 @@ u32 decodeInstruction(u8 *bytes) {
   case 0x0: {
     // is direct mode
     if (rm == 0x6) {
-      consumeByte(bytes, bytes_str, &cursor);
-      u8 low = bytes[cursor];
-      consumeByte(bytes, bytes_str, &cursor);
-      u8 hi = bytes[cursor];
+      u8 low = consumeByte(decoder);
+      u8 hi = consumeByte(decoder);
       u16 byte = (hi << 8) | low;
       sprintf(from_rm, "[%d]", byte);
       break;
@@ -221,11 +224,9 @@ u32 decodeInstruction(u8 *bytes) {
     printf("\n");
     printf("OPCODE: %hx | D: %d | W: %d | MOD: %d | REG: %d | R/M: %d", op_code,
            d_bit, w_bit, mod, reg, rm);
-    printf("\n%s\n", bytes_str);
+    printf("\n%s\n", decoder->debug_str);
   }
   printf("%s %s, %s\n", instructionToString(instruction), destination, source);
-
-  return cursor;
 }
 
 i32 main(i32 argc, char **argv) {
@@ -260,14 +261,16 @@ i32 main(i32 argc, char **argv) {
   fread(buffer, file_length, 1, file_ptr);
   fclose(file_ptr);
 
+  // buffer used to print the textual representation of the bytes consumed when
+  // verbose flag is set
+  char debug_str[32] = {0};
+  Decoder decoder = {.cursor = 0, .bytes = buffer + 0, .debug_str = debug_str};
+
   printf("bits 16\n");
-  u32 instruction_start = 0;
-  while (instruction_start < file_length) {
-    // last instruction read
-    instruction_start += decodeInstruction(buffer + instruction_start);
-    assert(instruction_start < file_length);
-    // start at the next one
-    instruction_start += 1;
+  while (decoder.cursor < file_length) {
+    decodeInstruction(&decoder);
+    // reset debug_str buff
+    debug_str[0] = '\0';
   }
 
   return 0;
