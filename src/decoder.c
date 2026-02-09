@@ -3,42 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "base_types.h"
-
-#define AL "al"
-#define CL "cl"
-#define DL "dl"
-#define BL "bl"
-#define AH "ah"
-#define CH "ch"
-#define DH "dh"
-#define BH "bh"
-#define AX "ax"
-#define CX "cx"
-#define DX "dx"
-#define BX "bx"
-#define SP "sp"
-#define BP "bp"
-#define SI "si"
-#define DI "di"
-
-#define BX_SI "bx + si"
-#define BX_DI "bx + di"
-#define BP_SI "bp + si"
-#define BP_DI "bp + di"
-#define SI "si"
-#define DI "di"
-#define BP "bp"
-#define BX "bx"
-
-#define BX_SI_D "bx + si + "
-#define BX_DI_D "bx + di + "
-#define BP_SI_D "bp + si + "
-#define BP_DI_D "bp + di + "
-#define SI_D "si + "
-#define DI_D "di + "
-#define BP_D "bp + "
-#define BX_D "bx + "
+#include "decoder.h"
 
 u8 verbose = 0;
 
@@ -46,16 +11,36 @@ u8 verbose = 0;
 const char *register_table[16] = {AL, CL, DL, BL, AH, CH, DH, BH,
                                   AX, CX, DX, BX, SP, BP, SI, DI};
 
-const char *effective_address_register_table[] = {
+const char *effective_address_register_table[45] = {
     BX_SI,   BX_DI,   BP_SI,   BP_DI,   SI,   DI,   BP,   BX,
     BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
     BX_SI_D, BX_DI_D, BP_SI_D, BP_DI_D, SI_D, DI_D, BP_D, BX_D,
 };
 
-typedef enum InstructionEnum { MOV } Instruction;
+// register/memory to/from register
+// immediate to register/memory
+// immediate to register
+// memory to accumulator
+// register/memory to segment register
+// segment register to register/memory
+//
+// register_memory__register
+// immediate__register_memory
+// immediate__register
+// memory__accumulator
+// register_memory_segment_register
+// segment_register__register_memory
 
 const char *instructionToString(Instruction i) {
   switch (i) {
+  case ADD:
+    return "add";
+  // case SUB:
+  //   return "sub";
+  // case CMP:
+  //   return "cmp";
+  // case JNZ:
+  //   return "jnz";
   case MOV:
     return "mov";
 
@@ -64,16 +49,6 @@ const char *instructionToString(Instruction i) {
     exit(1);
   }
 }
-
-typedef struct {
-  u64 cursor;
-  u8 *bytes;
-
-  // String representation of individual bits of each byte consumed
-  //
-  // eg:. 11010010 01101010
-  char *bit_pattern_str;
-} Decoder;
 
 u8 consumeByte(Decoder *decoder) {
   u8 current_byte = decoder->bytes[decoder->cursor];
@@ -96,56 +71,66 @@ u8 consumeByte(Decoder *decoder) {
   return current_byte;
 }
 
-// Decode the current instruction under cursor
-void decodeInstruction(Decoder *decoder) {
-  Instruction instruction;
-  u8 first_byte = consumeByte(decoder);
-
-  // OPCODE. extract bits 7 to 4 from first byte
+u8 isImediateToRegister(Decoder *decoder, u8 first_byte) {
   u8 op_code = first_byte >> 4;
-  switch (op_code) {
-  case 0xB: {
-    // check if W bit is set (00001000)
-    u8 w_bit = (first_byte & (1 << 3)) != 0;
-    // REG. extract bits 2 to 0 (00000111) from first byte
-    u8 reg = first_byte & 0x7;
-
-    char source[32];
-    const char *destination = register_table[(w_bit << 3) | reg];
-    u8 low = consumeByte(decoder);
-    if (w_bit == 1) {
-      u8 hi = consumeByte(decoder);
-      u16 byte = (hi << 8) | low;
-      sprintf(source, "%d", byte);
-    } else {
-      sprintf(source, "%d", low);
-    }
-
-    if (verbose) {
-      printf("\n");
-      printf("OPCODE: %hx | W: %d | REG: %d | register: %s", op_code, w_bit,
-             reg, destination);
-      printf("\n%s\n", decoder->bit_pattern_str);
-    }
-    printf("%s %s, %s\n", "mov", destination, source);
-    return;
-  }
+  if (op_code != 0xB) {
+    return 0;
   }
 
-  // OPCODE. extract bits 7 to 2 from first byte
-  op_code = first_byte >> 2;
+  // check if W bit is set (00001000)
+  u8 w_bit = (first_byte & (1 << 3)) != 0;
+  // REG. extract bits 2 to 0 (00000111) from first byte
+  u8 reg = first_byte & 0x7;
+
+  char source[32];
+  const char *destination = register_table[(w_bit << 3) | reg];
+  u8 low = consumeByte(decoder);
+  if (w_bit == 1) {
+    u8 hi = consumeByte(decoder);
+    u16 byte = (hi << 8) | low;
+    sprintf(source, "%d", byte);
+  } else {
+    sprintf(source, "%d", low);
+  }
+
+  if (verbose) {
+    printf("\n");
+    printf("OPCODE: %hx | W: %d | REG: %d | register: %s", op_code, w_bit, reg,
+           destination);
+    printf("\n%s\n", decoder->bit_pattern_str);
+  }
+  printf("%s %s, %s\n", "mov", destination, source);
+  return 1;
+}
+
+u8 isRegisterMemory(Decoder *decoder, u8 first_byte) {
+  Instruction instruction;
+
+  u8 op_code = first_byte >> 2;
   switch (op_code) {
-  case 0x22:
-  case 0x23:
-  case 0x28:
-  case 0x29:
+  case 0x0: {
+    instruction = ADD;
+    break;
+  }
+
   case 0x31:
+  case 0x22: {
     instruction = MOV;
     break;
+  }
+
+  case 0xA: {
+    instruction = SUB;
+    break;
+  }
+
+  case 0xE: {
+    instruction = CMP;
+    break;
+  }
 
   default:
-    printf("This instruction (0x%hx) is not implemented yet!", op_code);
-    exit(1);
+    return 0;
   }
 
   // check if D bit is set
@@ -225,7 +210,30 @@ void decodeInstruction(Decoder *decoder) {
            d_bit, w_bit, mod, reg, rm);
     printf("\n%s\n", decoder->bit_pattern_str);
   }
+
   printf("%s %s, %s\n", instructionToString(instruction), destination, source);
+
+  return 1;
+}
+
+// Decode the current instruction under cursor
+void decodeInstruction(Decoder *decoder) {
+  u8 first_byte = consumeByte(decoder);
+
+  // check if is imediate to register operation
+  if (isImediateToRegister(decoder, first_byte))
+    return;
+
+  // check if is register/memory to/from register mode
+  if (isRegisterMemory(decoder, first_byte))
+    return;
+
+  printf("\nThis byte (");
+  for (i32 i = 7; i >= 0; i--) {
+    printf("%d", (first_byte & (1 << i)) != 0);
+  }
+  printf(") does not encode a known instruction!");
+  exit(1);
 }
 
 i32 main(i32 argc, char **argv) {
@@ -263,7 +271,8 @@ i32 main(i32 argc, char **argv) {
   // buffer used to print the textual representation of the bytes consumed when
   // verbose flag is set
   char bit_pattern_str[32] = {0};
-  Decoder decoder = {.cursor = 0, .bytes = file_content, .bit_pattern_str = bit_pattern_str};
+  Decoder decoder = {
+      .cursor = 0, .bytes = file_content, .bit_pattern_str = bit_pattern_str};
 
   printf("bits 16\n");
   while (decoder.cursor < file_length) {
